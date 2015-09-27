@@ -2,7 +2,7 @@
 #include "ble/DiscoveredCharacteristic.h"
 #include "ble/DiscoveredService.h"
 
-#if defined(MCU_NORDIC_16K_S110) || defined(MCU_NORDIC_32K_S110)
+#if YOTTA_CFG_MICROBIT_S130 != 1
 #error This code *only* works with the Nordik S130 softdevice
 #endif
 
