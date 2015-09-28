@@ -12,7 +12,7 @@
       "mbed-classic": "~0.0.4",
       "ble": "remay/BLE_API#master",
       "ble-nrf51822": "remay/ble-nrf51822#master",
-      "microbit-dal":"remay/microbit-dal#master"
+      "microbit-dal":"remay/microbit-dal#develop"
   },
   "targetDependencies": {},
   "bin": "./source"
