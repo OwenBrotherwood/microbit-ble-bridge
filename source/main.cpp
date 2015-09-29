@@ -36,6 +36,21 @@ DiscoveredCharacteristic clientEventCharacteristic;
 bool foundMicrobitEventCharacteristic = false;
 bool foundClientEventCharacteristic   = false;
 
+uint8_t set_device_id (const char* id) {
+    uint8_t changed = 0;
+
+    if(!device_id) { device_id = (char *)malloc(6); memset(device_id, 0, 6); }
+
+    if(memcmp(device_id, id, 5) != 0) {
+        /* id changed */
+        memcpy(device_id, id, 5);
+        SD("Set device to '%s'", device_id);
+        changed = 1;
+    }
+
+    return changed;
+}
+
 void advertisementCallback(const Gap::AdvertisementCallbackParams_t *params) {
     /* Walk the advertising data, looking for COMPLETE_LOCAL_NAME, matching "BBC MicroBit [xxxxx]"
      * and connect to this device, only if the xxxxx matches the one we are expecting.
@@ -50,7 +65,7 @@ void advertisementCallback(const Gap::AdvertisementCallbackParams_t *params) {
             if((memcmp(MICROBIT_BLE_DEVICE_NAME,&((params->advertisingData)[pos+2]), 14)) == 0) {
                 /* found a micro:bit */
                 if(!device_id) {
-                    set_device_id(&((params->advertisingData)[pos+2+14]));
+                    set_device_id((char *)&((params->advertisingData)[pos+2+14]));
                 }
 
                 if(memcmp(device_id, &((params->advertisingData)[pos+2+14]), 5) == 0) {
@@ -123,21 +138,6 @@ void hvxCallback(const GattHVXCallbackParams *params) {
             SPUB_EVENT(e->type, e->reason);
         }
     }
-}
-
-uint8_t set_device_id (const char* id) {
-    uint8_t changed = 0;
-
-    if(!device_id) { device_id = (char *)malloc(6); memset(device_id, 0, 6); }
-
-    if(memcmp(device_id, id, 5) != 0) {
-        /* id changed */
-        memcpy(device_id, id, 5);
-        SD("Set device to '%s'", device_id);
-        changed = 1;
-    }
-
-    return changed;
 }
 
 #define CMD_CMD    0
