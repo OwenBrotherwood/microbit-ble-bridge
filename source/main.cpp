@@ -168,8 +168,11 @@ void process_cmd(char* s) {
             parts[CMD_TOPIC]  && (strlen(parts[CMD_TOPIC])  == 10) && (memcmp(parts[CMD_TOPIC], "mb\\setname",10) == 0) &&
 	    parts[CMD_DEVICE] && (strlen(parts[CMD_DEVICE]) ==  5) )
         {
-		set_device_id(parts[CMD_DEVICE]);
+		uint8_t name_changed = set_device_id(parts[CMD_DEVICE]);
                 /* If device id has been changed then we should drop the connectiona and re-start the scan for the new device */
+		if(uBit.ble->getGapState().connected && name_changed) {
+			uBit.ble->gap().disconnect(Gap::REMOTE_USER_TERMINATED_CONNECTION);
+		}
 	}
 
 	/* Send Event command */
