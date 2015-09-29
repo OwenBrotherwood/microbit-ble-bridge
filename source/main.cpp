@@ -24,7 +24,6 @@
 /* NOTES
  * XXX Why is the stack using short UUIDs for our (presumably) private services and characteristics?
  * XXX Would be great to have some code review by someone who knows what they're talking about - I've cargo culted most of this
- * XXX Do we want a way (e.g. button press while '?' displayed) to allow connection to first micro:bit found?
  * XXX Review states displayed on screen, and ensure that it makes sense if connection is lost and re-scan starts
  * XXX Protocol - should we move mb/setdevice from the 'I' class to something else? ('C'onfig?)
  */
@@ -52,12 +51,17 @@ void advertisementCallback(const Gap::AdvertisementCallbackParams_t *params) {
 	if (type == GapAdvertisingData::COMPLETE_LOCAL_NAME) {
 		/* If it's advertising as a micro:bit with the right unique name */
 		if((memcmp(MICROBIT_BLE_DEVICE_NAME,&((params->advertisingData)[pos+2]), 14)) == 0) {
+			/* found a micro:bit */
+                        if(!device_id) {
+				set_device_id(&((params->advertisingData)[pos+2+14]));
+			}
+
                         if(memcmp(device_id, &((params->advertisingData)[pos+2+14]), 5) == 0) {
 			    SD("Found microbit %s", device_id);
 		            if(BLE_ERROR_NONE == uBit.ble->gap().connect(params->peerAddr, Gap::ADDR_TYPE_RANDOM_STATIC, NULL, NULL)) {
 				uBit.ble->gap().stopScan();
 		       	    }
-    			return; /* we're done - if the connect failed, then we'll try again on the next advertising cycle */
+			    return; /* we're done - if the connect failed, then we'll try again on the next advertising cycle */
                         }
 		}
 	}
@@ -124,6 +128,21 @@ void hvxCallback(const GattHVXCallbackParams *params) {
     }
 }
 
+uint8_t set_device_id (const char* id) {
+	uint8_t changed = 0;
+
+	if(!device_id) { device_id = (char *)malloc(6); memset(device_id, 0, 6); }
+
+	if(memcmp(device_id, id, 5) != 0) {
+		/* id changed */
+		memcpy(device_id, id, 5);
+		SD("Set device to '%s'", device_id);
+		changed = 1;
+	}
+
+	return changed;
+}
+
 #define CMD_CMD    0
 #define CMD_DEVICE 1
 #define CMD_TOPIC  2
@@ -149,11 +168,8 @@ void process_cmd(char* s) {
             parts[CMD_TOPIC]  && (strlen(parts[CMD_TOPIC])  == 10) && (memcmp(parts[CMD_TOPIC], "mb\\setname",10) == 0) &&
 	    parts[CMD_DEVICE] && (strlen(parts[CMD_DEVICE]) ==  5) )
         {
-		if(!device_id) { device_id = (char *)malloc(6); }
+		set_device_id(parts[CMD_DEVICE]));
                 /* If device id has been changed then we should drop the connectiona and re-start the scan for the new device */
-		memcpy(device_id, parts[CMD_DEVICE], 5);
-		device_id[5] = '\0';
-		SD("Set device to '%s'", device_id);
 	}
 
 	/* Send Event command */
@@ -216,9 +232,10 @@ void app_main() {
     uBit.ble->gattClient().onHVX(hvxCallback);
     uBit.serial.attach(serialRxCallback);
 
-    /* Wait until we have a device id to connect to */
+    /* Wait until we have a device id to connect to
+     * OR press button A to connect to the first found micro:bit */
     uBit.display.print('?');
-    while(!device_id) {
+    while(!device_id && !uBit.buttonA.isPressed()) {
 	uBit.sleep(1000);
     }
 
