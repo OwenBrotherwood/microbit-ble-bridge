@@ -79,13 +79,12 @@ void discoveryTerminationCallback(Gap::Handle_t connectionHandle) {
         /* Request notifications */
         ble_error_t e = microbitEventCharacteristic.requestHVX(BLE_HVX_NOTIFICATION);
         if(BLE_ERROR_NONE != e) { SD("ERROR: Notification request returned: %u", e); }
-            uBit.display.print('C'); /* Connected, service/characteristic scan finished, ready to do work */
-        }
-        else {
-            /* If we haven't found the expected characcteristics, then drop the connection which will result in us
-             * re-starting the scan/connect sequence */
-            uBit.ble->gap().disconnect(Gap::REMOTE_USER_TERMINATED_CONNECTION);
-        }
+        uBit.display.print('C'); /* Connected, service/characteristic scan finished, ready to do work */
+    }
+    else {
+        /* If we haven't found the expected characcteristics, then drop the connection which will result in us
+         * re-starting the scan/connect sequence */
+        uBit.ble->gap().disconnect(Gap::REMOTE_USER_TERMINATED_CONNECTION);
     }
 }
 
