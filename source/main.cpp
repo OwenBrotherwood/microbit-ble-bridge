@@ -168,7 +168,7 @@ void process_cmd(char* s) {
             parts[CMD_TOPIC]  && (strlen(parts[CMD_TOPIC])  == 10) && (memcmp(parts[CMD_TOPIC], "mb\\setname",10) == 0) &&
 	    parts[CMD_DEVICE] && (strlen(parts[CMD_DEVICE]) ==  5) )
         {
-		set_device_id(parts[CMD_DEVICE]));
+		set_device_id(parts[CMD_DEVICE]);
                 /* If device id has been changed then we should drop the connectiona and re-start the scan for the new device */
 	}
 
