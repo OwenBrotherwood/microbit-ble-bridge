@@ -58,17 +58,17 @@ void advertisementCallback(const Gap::AdvertisementCallbackParams_t *params) {
     uint8_t len = params->advertisingDataLen;
     uint8_t pos = 0;
     while(len > pos) {
-        uint8_t adlen = (params->advertisingData)[pos];
-        uint8_t type  = (params->advertisingData)[pos+1];
+        uint8_t adlen = *(params->advertisingData);
+        uint8_t type  = *(params->advertisingData+1);
         if (type == GapAdvertisingData::COMPLETE_LOCAL_NAME) {
             /* If it's advertising as a micro:bit with the right unique name */
-            if((memcmp(MICROBIT_BLE_DEVICE_NAME,&((params->advertisingData)[pos+2]), 14)) == 0) {
+            if(memcmp(MICROBIT_BLE_DEVICE_NAME,params->advertisingData+pos+2, 14) == 0) {
                 /* found a micro:bit */
                 if(!device_id) {
-                    set_device_id((char *)&((params->advertisingData)[pos+2+14]));
+                    set_device_id((char *)(params->advertisingData+pos+2+14));
                 }
 
-                if(memcmp(device_id, &((params->advertisingData)[pos+2+14]), 5) == 0) {
+                if(memcmp(device_id, params->advertisingData+pos+2+14, 5) == 0) {
                     SD("Found microbit %s", device_id);
                     if(BLE_ERROR_NONE == uBit.ble->gap().connect(params->peerAddr, Gap::ADDR_TYPE_RANDOM_STATIC, NULL, NULL)) {
                         uBit.ble->gap().stopScan();
@@ -90,6 +90,8 @@ void start_ad_scan() {
 }
 
 void discoveryTerminationCallback(Gap::Handle_t connectionHandle) {
+    (void) connectionHandle; /* -Wunused-parameter */
+
     if (foundMicrobitEventCharacteristic && foundClientEventCharacteristic) {
         /* Request notifications */
         ble_error_t e = microbitEventCharacteristic.requestHVX(BLE_HVX_NOTIFICATION);
@@ -124,6 +126,9 @@ void connectionCallback(const Gap::ConnectionCallbackParams_t *params) {
 }
 
 void disconnectionCallback(Gap::Handle_t handle, Gap::DisconnectionReason_t reason) {
+    (void) handle; /* -Wunused-parameter */
+    (void) reason; /* -Wunused-parameter */
+
     /* re-start Scan */
     start_ad_scan();
 }
@@ -161,7 +166,7 @@ void process_cmd(char* s) {
     }
 
     /* Set device command */
-    if( parts[CMD_CMD]    && (strlen(parts[CMD_CMD])    ==  1) && (memcmp(parts[CMD_CMD],   "I",          1) == 0) &&
+    if( parts[CMD_CMD]    && (strlen(parts[CMD_CMD])    ==  1) && (memcmp(parts[CMD_CMD]  , "I"          , 1) == 0) &&
         parts[CMD_TOPIC]  && (strlen(parts[CMD_TOPIC])  == 10) && (memcmp(parts[CMD_TOPIC], "mb\\setname",10) == 0) &&
         parts[CMD_DEVICE] && (strlen(parts[CMD_DEVICE]) ==  5) )
     {
@@ -173,12 +178,12 @@ void process_cmd(char* s) {
     }
 
     /* Send Event command */
-    if( parts[CMD_CMD]    && (strlen(parts[CMD_CMD])    ==  1) && (memcmp(parts[CMD_CMD],   "I",          1) == 0) &&
-        parts[CMD_TOPIC]  && (strlen(parts[CMD_TOPIC])  ==  9) && (memcmp(parts[CMD_TOPIC], "mb\\evtsvc", 9) == 0) &&
-        parts[CMD_DEVICE] && (strlen(parts[CMD_DEVICE]) ==  5) && (memcmp(parts[CMD_DEVICE], device_id,   5) == 0) &&
+    if( parts[CMD_CMD]    && (strlen(parts[CMD_CMD])    ==  1) && (memcmp(parts[CMD_CMD]   , "I"         , 1) == 0) &&
+        parts[CMD_TOPIC]  && (strlen(parts[CMD_TOPIC])  ==  9) && (memcmp(parts[CMD_TOPIC] , "mb\\evtsvc", 9) == 0) &&
+        parts[CMD_DEVICE] && (strlen(parts[CMD_DEVICE]) ==  5) && (memcmp(parts[CMD_DEVICE], device_id   , 5) == 0) &&
         parts[CMD_DATA]   && (strlen(parts[CMD_DATA])   >   0) )
     {
-        EventServiceEvent evt = {};
+        EventServiceEvent evt;
         char *p = parts[CMD_DATA];
         char *s;
         char *end;
@@ -192,8 +197,7 @@ void process_cmd(char* s) {
         evt.reason = strtoul(s, &end, 0);
 
         /* Validate the parsing and values, and send events back onto the event bus of the remote device */
-        if (foundClientEventCharacteristic && end == e && evt.type > 0 && evt.type <= 0xFFFF 
-            && evt.reason > 0 && evt.reason <= 0xFFFF) {
+        if (foundClientEventCharacteristic && end == e && evt.type > 0 && evt.reason > 0) {
             ble_error_t e = clientEventCharacteristic.write(sizeof(evt),(const uint8_t*)(&evt));
             if(BLE_ERROR_NONE != e) { SD("ERROR: Write request returned: %u", e); }
         }
