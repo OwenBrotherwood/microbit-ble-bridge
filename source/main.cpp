@@ -58,13 +58,13 @@ void advertisementCallback(const Gap::AdvertisementCallbackParams_t *params) {
     uint8_t len = params->advertisingDataLen;
     uint8_t pos = 0;
     while(len > pos) {
-        uint8_t adlen = *(params->advertisingData);
-        uint8_t type  = *(params->advertisingData+1);
+        uint8_t adlen = *(params->advertisingData+pos);
+        uint8_t type  = *(params->advertisingData+pos+1);
         if (type == GapAdvertisingData::COMPLETE_LOCAL_NAME) {
-            /* If it's advertising as a micro:bit with the right unique name */
-            if(memcmp(MICROBIT_BLE_DEVICE_NAME,params->advertisingData+pos+2, 14) == 0) {
+            if( (adlen >= 14) && (memcmp(MICROBIT_BLE_DEVICE_NAME,params->advertisingData+pos+2, 14) == 0) ) {
                 /* found a micro:bit */
-                if(!device_id) {
+                if((adlen >= 14+5) && !device_id) {
+                    /* haven't seen an attempt to set the name, so use the one found */
                     set_device_id((char *)(params->advertisingData+pos+2+14));
                 }
 
@@ -77,7 +77,7 @@ void advertisementCallback(const Gap::AdvertisementCallbackParams_t *params) {
                 }
             }
         }
-        pos = pos + adlen + 1;
+        pos = pos + adlen;
     }
 }
 
@@ -209,7 +209,7 @@ void serialRxCallback () {
     static uint8_t pos = 0;
     char c;
 
-    while(uBit.serial.readable()) {
+    while(uBit.serial.readable()) { /* Can this starve the rest of the program? */
         c = uBit.serial.getc();
 
         if(c == '\n') {
@@ -237,10 +237,10 @@ void app_main() {
     uBit.serial.attach(serialRxCallback);
 
     /* Wait until we have a device id to connect to
-     * OR press button A to connect to the first found micro:bit */
+     * OR press (and hold for up to one sec) button A to connect to the first found micro:bit */
     uBit.display.print('?');
     while(!device_id && !uBit.buttonA.isPressed()) {
-        uBit.sleep(1000);
+        uBit.sleep(1000); /* should we reduce this sleep to make the button response better? */
     }
 
     start_ad_scan(); /* start the scan/discover/connect sequence */
