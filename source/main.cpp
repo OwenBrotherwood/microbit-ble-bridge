@@ -26,6 +26,8 @@
 
 #define SPUB_EVENT(type, reason) uBit.serial.printf ("P %s %s 0x%04x:0x%04x\n", device_id, "mb\\evtsvc", type, reason)
 
+extern char* MICROBIT_BLE_DEVICE_NAME;
+
 /* NOTES
 * XXX Would be great to have some code review by someone who knows what they're talking about - I've cargo culted most of this
 */
