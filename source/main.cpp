@@ -26,7 +26,9 @@
 
 #define SPUB_EVENT(type, reason) uBit.serial.printf ("P %s %s 0x%04x:0x%04x\n", device_id, "mb\\evtsvc", type, reason)
 
-extern char* MICROBIT_BLE_DEVICE_NAME;
+static const char MICROBIT_BLE_DEVICE_PREFIX[] = "BBC micro:bit [";
+#define MICROBIT_BLE_DEVICE_PREFIX_LENGTH (sizeof(MICROBIT_BLE_DEVICE_PREFIX) - 1)
+#define MICROBIT_BLE_DEVICE_NAME_LENGTH (MICROBIT_BLE_DEVICE_PREFIX_LENGTH + MICROBIT_NAME_LENGTH + 1)
 
 /* NOTES
 * XXX Would be great to have some code review by someone who knows what they're talking about - I've cargo culted most of this
@@ -41,11 +43,11 @@ bool foundClientEventCharacteristic   = false;
 uint8_t set_device_id (const char* id) {
     uint8_t changed = 0;
 
-    if(!device_id) { device_id = (char *)malloc(6); memset(device_id, 0, 6); }
+    if(!device_id) { device_id = (char *)malloc(MICROBIT_NAME_LENGTH + 1); memset(device_id, 0, MICROBIT_NAME_LENGTH + 1); }
 
-    if(memcmp(device_id, id, 5) != 0) {
+    if(memcmp(device_id, id, MICROBIT_NAME_LENGTH) != 0) {
         /* id changed */
-        memcpy(device_id, id, 5);
+        memcpy(device_id, id, MICROBIT_NAME_LENGTH);
         SD("Set device to '%s'", device_id);
         changed = 1;
     }
@@ -63,15 +65,17 @@ void advertisementCallback(const Gap::AdvertisementCallbackParams_t *params) {
         uint8_t adlen = *(params->advertisingData+pos);
         uint8_t type  = *(params->advertisingData+pos+1);
         if (type == GapAdvertisingData::COMPLETE_LOCAL_NAME) {
-            if( (adlen >= 14) && (memcmp(MICROBIT_BLE_DEVICE_NAME,params->advertisingData+pos+2, 14) == 0) ) {
+            if( (adlen >= MICROBIT_BLE_DEVICE_PREFIX_LENGTH+1) && (memcmp(MICROBIT_BLE_DEVICE_PREFIX,params->advertisingData+pos+2, MICROBIT_BLE_DEVICE_PREFIX_LENGTH) == 0) ) {
                 /* found a micro:bit */
-                if((adlen >= 14+5) && !device_id) {
+                if((adlen >= MICROBIT_BLE_DEVICE_NAME_LENGTH+1) && !device_id) {
                     /* haven't seen an attempt to set the name, so use the one found */
-                    set_device_id((char *)(params->advertisingData+pos+2+14));
+                    set_device_id((char *)(params->advertisingData+pos+2+MICROBIT_BLE_DEVICE_PREFIX_LENGTH));
                 }
 
-                if(memcmp(device_id, params->advertisingData+pos+2+14, 5) == 0) {
+                if(memcmp(device_id, params->advertisingData+pos+2+MICROBIT_BLE_DEVICE_PREFIX_LENGTH, MICROBIT_NAME_LENGTH) == 0) {
                     SD("Found microbit %s", device_id);
+// TODO: Stop scan before connect?
+// Don't re-start scan while flash operations are in progress.
                     if(BLE_ERROR_NONE == uBit.ble->gap().connect(params->peerAddr, Gap::ADDR_TYPE_RANDOM_STATIC, NULL, NULL)) {
                         uBit.ble->gap().stopScan();
                     }
@@ -96,8 +100,9 @@ void discoveryTerminationCallback(Gap::Handle_t connectionHandle) {
 
     if (foundMicrobitEventCharacteristic && foundClientEventCharacteristic) {
         /* Request notifications */
-        ble_error_t e = microbitEventCharacteristic.requestHVX(BLE_HVX_NOTIFICATION);
-        if(BLE_ERROR_NONE != e) { SD("ERROR: Notification request returned: %u", e); }
+        /* TODO: Move this to only happen once security of link is established */
+        //ble_error_t e = microbitEventCharacteristic.requestHVX(BLE_HVX_NOTIFICATION);
+        //if(BLE_ERROR_NONE != e) { SD("ERROR: Notification request returned: %u", e); }
         uBit.display.print('C'); /* Connected, service/characteristic scan finished, ready to do work */
     }
     else {
@@ -121,9 +126,14 @@ void characteristicDiscoveryCallback(const DiscoveredCharacteristic *characteris
 void connectionCallback(const Gap::ConnectionCallbackParams_t *params) {
     SD("Connected to %s", device_id);
     if (params->role == Gap::CENTRAL) {
-        uBit.display.print('D'); /* Discovery phase */
-        uBit.ble->gattClient().onServiceDiscoveryTermination(discoveryTerminationCallback);
-        uBit.ble->gattClient().launchServiceDiscovery(params->handle, NULL ,characteristicDiscoveryCallback);
+        SD("Starting security");
+	ble_error_t e = uBit.ble->securityManager().secureConnection(params->handle);
+        if(BLE_ERROR_NONE != e) { SD("ERROR: secureConnection() returned: %u", e); }
+
+        //SD("Starting Service and Characteristic Discovery");
+        //uBit.display.print('D'); /* Discovery phase */
+        //uBit.ble->gattClient().onServiceDiscoveryTermination(discoveryTerminationCallback);
+        //uBit.ble->gattClient().launchServiceDiscovery(params->handle, NULL ,characteristicDiscoveryCallback);
     }
 }
 
@@ -168,7 +178,7 @@ void process_cmd(char* s) {
     /* Set device command */
     if( parts[CMD_CMD]    && (strlen(parts[CMD_CMD])    ==  1) && (memcmp(parts[CMD_CMD]  , "I"          , 1) == 0) &&
         parts[CMD_TOPIC]  && (strlen(parts[CMD_TOPIC])  == 10) && (memcmp(parts[CMD_TOPIC], "mb\\setname",10) == 0) &&
-        parts[CMD_DEVICE] && (strlen(parts[CMD_DEVICE]) ==  5) )
+        parts[CMD_DEVICE] && (strlen(parts[CMD_DEVICE]) ==  MICROBIT_NAME_LENGTH) )
     {
         uint8_t name_changed = set_device_id(parts[CMD_DEVICE]);
         /* If device id has been changed then we should drop the connectiona and re-start the scan for the new device */
@@ -180,7 +190,7 @@ void process_cmd(char* s) {
     /* Send Event command */
     if( parts[CMD_CMD]    && (strlen(parts[CMD_CMD])    ==  1) && (memcmp(parts[CMD_CMD]   , "I"         , 1) == 0) &&
         parts[CMD_TOPIC]  && (strlen(parts[CMD_TOPIC])  ==  9) && (memcmp(parts[CMD_TOPIC] , "mb\\evtsvc", 9) == 0) &&
-        parts[CMD_DEVICE] && (strlen(parts[CMD_DEVICE]) ==  5) && (memcmp(parts[CMD_DEVICE], device_id   , 5) == 0) &&
+        parts[CMD_DEVICE] && (strlen(parts[CMD_DEVICE]) ==  MICROBIT_NAME_LENGTH) && (memcmp(parts[CMD_DEVICE], device_id   , MICROBIT_NAME_LENGTH) == 0) &&
         parts[CMD_DATA]   && (strlen(parts[CMD_DATA])   >   0) )
     {
         EventServiceEvent evt;
@@ -229,12 +239,19 @@ void serialRxCallback () {
     }
 }
 
+void passkeyRequestCallback (Gap::Handle_t handle, SecurityManager::Passkey_t passkey) {
+  // TODO: fill in the passkey
+  uBit.panic(255);
+}
+
 void app_main() {
-    uBit.ble = new BLEDevice();
-    uBit.ble->init();
+    SD("Starting ...");
+    // uBit.ble->stopAdvertising();
     uBit.ble->gap().onDisconnection(disconnectionCallback);
     uBit.ble->gap().onConnection(connectionCallback);
     uBit.ble->gattClient().onHVX(hvxCallback);
+
+    uBit.ble->securityManager().onPasskeyRequest(passkeyRequestCallback);
     uBit.serial.attach(serialRxCallback);
 
     /* Wait until we have a device id to connect to
@@ -244,7 +261,9 @@ void app_main() {
         uBit.sleep(20);
     }
 
+    SD("Starting scan ...");
     start_ad_scan(); /* start the scan/discover/connect sequence */
+    SD("Scan started ...");
 
     while (true) {
         uBit.ble->waitForEvent();

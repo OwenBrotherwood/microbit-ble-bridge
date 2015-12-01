@@ -8,8 +8,18 @@
 //
 // We don't want to use any of the micro:bit BLE services, so we disable them
 
-#define MICROBIT_BLE_ENABLED        0
+#define MICROBIT_BLE_ENABLED        1
 #define MICROBIT_BLE_BLUEZONE       0 // We don't need this either
+
+#define MICROBIT_BLE_DFU_SERVICE                0
+#define MICROBIT_BLE_EVENT_SERVICE              0
+#define MICROBIT_BLE_DEVICE_INFORMATION_SERVICE 0
+#define MICROBIT_BLE_LED_SERVICE                0
+#define MICROBIT_BLE_ACCELEROMETER_SERVICE      0
+#define MICROBIT_BLE_MAGNETOMETER_SERVICE       0
+#define MICROBIT_BLE_BUTTON_SERVICE             0
+#define MICROBIT_BLE_IO_PIN_SERVICE             0
+#define MICROBIT_BLE_TEMPERATURE_SERVICE        0
 
 // But we are going to bring up the S130 soft-device.  The DAL assumes that
 // if MICROBIT_BLE_ENABLED is not set then the memory from the softdevice
