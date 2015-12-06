@@ -100,9 +100,8 @@ void discoveryTerminationCallback(Gap::Handle_t connectionHandle) {
 
     if (foundMicrobitEventCharacteristic && foundClientEventCharacteristic) {
         /* Request notifications */
-        /* TODO: Move this to only happen once security of link is established */
-        //ble_error_t e = microbitEventCharacteristic.requestHVX(BLE_HVX_NOTIFICATION);
-        //if(BLE_ERROR_NONE != e) { SD("ERROR: Notification request returned: %u", e); }
+        ble_error_t e = microbitEventCharacteristic.requestHVX(BLE_HVX_NOTIFICATION); // XXX This should trigger securing of link
+        if(BLE_ERROR_NONE != e) { SD("ERROR: Notification request returned: %u", e); }
         uBit.display.print('C'); /* Connected, service/characteristic scan finished, ready to do work */
     }
     else {
@@ -126,14 +125,14 @@ void characteristicDiscoveryCallback(const DiscoveredCharacteristic *characteris
 void connectionCallback(const Gap::ConnectionCallbackParams_t *params) {
     SD("Connected to %s", device_id);
     if (params->role == Gap::CENTRAL) {
-        SD("Starting security");
-	ble_error_t e = uBit.ble->securityManager().secureConnection(params->handle);
-        if(BLE_ERROR_NONE != e) { SD("ERROR: secureConnection() returned: %u", e); }
+        //SD("Starting security");
+	//ble_error_t e = uBit.ble->securityManager().secureConnection(params->handle);
+        //if(BLE_ERROR_NONE != e) { SD("ERROR: secureConnection() returned: %u", e); }
 
-        //SD("Starting Service and Characteristic Discovery");
-        //uBit.display.print('D'); /* Discovery phase */
-        //uBit.ble->gattClient().onServiceDiscoveryTermination(discoveryTerminationCallback);
-        //uBit.ble->gattClient().launchServiceDiscovery(params->handle, NULL ,characteristicDiscoveryCallback);
+        SD("Starting Service and Characteristic Discovery");
+        uBit.display.print('D'); /* Discovery phase */
+        uBit.ble->gattClient().onServiceDiscoveryTermination(discoveryTerminationCallback);
+        uBit.ble->gattClient().launchServiceDiscovery(params->handle, NULL ,characteristicDiscoveryCallback);
     }
 }
 
